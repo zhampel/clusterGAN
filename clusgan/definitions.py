@@ -8,3 +8,6 @@ REPO_DIR = os.path.split(CLUSGAN_DIR)[0]
 
 # Local directory for datasets
 DATASETS_DIR = os.path.join(REPO_DIR, 'datasets')
+
+# Local directory for runs
+RUNS_DIR = os.path.join(REPO_DIR, 'runs')

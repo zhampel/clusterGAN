@@ -1,3 +1,12 @@
+# Ignore contents of virtual environment directory
+venv/*
+
+# Ignore downloaded datasets directory
+datasets/*
+
+# Ignore saved run information: models, figures, images
+runs/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

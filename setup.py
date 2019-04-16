@@ -88,11 +88,10 @@ setup(
     author_email=MAINTAINER_EMAIL,
     url=URL,
     packages=['clusgan'],
-    #packages=find_packages(),
     install_requires=INSTALL_REQUIRES, #external packages as dependencies
     setup_requires=['setuptools>=38.6.0'],
     scripts=[
-             'train_mnist.py',
+             'scripts/train_mnist.py',
             ],
     # $ setup.py publish support.
     cmdclass={

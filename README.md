@@ -14,8 +14,13 @@ The package as well as the necessary requirements can be installed by running `m
 python setup.py install
 ```
 
+## Run ClusterGAN on MNIST
 
-
+To run ClusterGAN on the MNIST dataset, ensure the package is setup and then run
+```
+python train_mnist.py -r test_run
+```
+where a directory `runs/test_run` will be made and contain the generated output from the training run.
 
 ## License
 
