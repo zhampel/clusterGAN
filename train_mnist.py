@@ -26,7 +26,7 @@ try:
 
     from clusgan.definitions import DATASETS_DIR, RUNS_DIR
     from clusgan.models import Generator_CNN, Encoder_CNN, Discriminator_CNN
-    from clusgan.utils import tlog, softmax, initialize_weights, calc_gradient_penalty, sample_z
+    from clusgan.utils import tlog, softmax, initialize_weights, calc_gradient_penalty, sample_z, cross_entropy
     from clusgan.plots import plot_train_loss
 except ImportError as e:
     print(e)
@@ -124,10 +124,8 @@ def main():
     #for epoch in range(n_epochs, 2*n_epochs):
     for epoch in range(n_epochs):
         for i, (imgs, _) in enumerate(dataloader):
-            
-            #scheduler_GE.batch_step()
-            #scheduler_D.batch_step()
-            
+           
+            # Zero gradients for models
             generator.zero_grad()
             encoder.zero_grad()
             discriminator.zero_grad()
@@ -177,21 +175,20 @@ def main():
             if (i % 5 == 0):
     
                 # Encode the generated images
-                enc_gen_zn, enc_gen_zc = encoder(gen_imgs)
+                enc_gen_zn, enc_gen_zc, enc_gen_zc_logits = encoder(gen_imgs)
     
                 # Calculate losses for z_n, z_c
                 zn_loss = mse_loss(enc_gen_zn, zn)
-                zc_loss = xe_loss(enc_gen_zc, zc_idx)
+                zc_loss = cross_entropy(enc_gen_zc, zc)
+                #zc_loss = xe_loss(enc_gen_zc, zc_idx)
     
                 # Check requested metric
                 if wass_metric:
                     # Wasserstein GAN loss
                     ge_loss = torch.mean(D_gen) + betan * torch.mean(zn_loss) + betac * torch.mean(zc_loss)
-                    #ge_loss = torch.mean(torch.mean(D_gen) + betan * zn_loss + betac * zc_loss)
                 else:
                     # Vanilla GAN loss
                     ge_loss = -torch.mean(tlog(D_gen)) + betan * torch.mean(zn_loss) + betac * torch.mean(zc_loss)
-                    #ge_loss = torch.mean(-tlog(D_gen) + betan * zn_loss + betac * zc_loss)
     
                 ge_loss.backward(retain_graph=True)
                 optimizer_GE.step()
@@ -225,18 +222,21 @@ def main():
 
         # Cycle through real -> enc -> gen
         r_imgs = real_imgs.data[:25]
-        e_zn, e_zc = encoder(r_imgs, seval=True)
+        e_zn, e_zc, e_zc_logits = encoder(r_imgs, seval=True)
         reg_imgs = generator(e_zn, e_zc)
         img_mse_loss = mse_loss(r_imgs, reg_imgs)
+        
         # Save img reco cycle loss
         c_i.append(img_mse_loss.item())
         
         # Cycle through enc -> gen -> enc
         zn_samp, zc_samp, zc_samp_idx = sample_z(shape=25, latent_dim=latent_dim, n_c=n_c, req_grad=False)
         gen_imgs_samp = generator(zn_samp, zc_samp)
-        zn_e, zc_e = encoder(gen_imgs_samp, seval=True)
+        zn_e, zc_e, zc_e_logits = encoder(gen_imgs_samp, seval=True)
         lat_mse_loss = mse_loss(zn_e, zn_samp)
-        lat_xe_loss = xe_loss(zc_e, zc_samp_idx)
+        lat_xe_loss = cross_entropy(zc_e, zc_samp)
+        #lat_xe_loss = xe_loss(zc_e, zc_samp_idx)
+
         # Save cycle losses
         c_zn.append(lat_mse_loss.item())
         c_zc.append(lat_xe_loss.item())

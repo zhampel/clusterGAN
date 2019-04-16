@@ -135,10 +135,10 @@ class Encoder_CNN(nn.Module):
         z = z_img.view(z_img.shape[0], -1)
         # Separate continuous and one-hot components
         zn = z[:, 0:self.latent_dim]
-        zc = z[:, self.latent_dim:]
+        zc_logits = z[:, self.latent_dim:]
         # Softmax on zc component
-        zc = softmax(zc)
-        return zn, zc
+        zc = softmax(zc_logits)
+        return zn, zc, zc_logits
 
 
 class Discriminator_CNN(nn.Module):
