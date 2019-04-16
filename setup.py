@@ -91,7 +91,7 @@ setup(
     install_requires=INSTALL_REQUIRES, #external packages as dependencies
     setup_requires=['setuptools>=38.6.0'],
     scripts=[
-             'scripts/train_mnist.py',
+             'train_mnist.py',
             ],
     # $ setup.py publish support.
     cmdclass={

@@ -7,6 +7,8 @@ try:
 
     import matplotlib
     import matplotlib.pyplot as plt
+
+    import pandas as pd
     
     from torch.autograd import Variable
     from torch.autograd import grad as torch_grad
@@ -25,6 +27,7 @@ try:
     from clusgan.definitions import DATASETS_DIR, RUNS_DIR
     from clusgan.models import Generator_CNN, Encoder_CNN, Discriminator_CNN
     from clusgan.utils import tlog, softmax, initialize_weights, calc_gradient_penalty, sample_z
+    from clusgan.plots import plot_train_loss
 except ImportError as e:
     print(e)
     raise ImportError
@@ -35,10 +38,13 @@ def main():
     parser.add_argument("-r", "--run_name", dest="run_name", default='clusgan', help="Name of training run")
     args = parser.parse_args()
 
-    # Make a directory for this run
+    # Make directory structure for this run
     run_name = args.run_name
     run_dir = '%s/%s'%(RUNS_DIR, run_name)
+    imgs_dir = '%s/images'%(run_dir)
     os.makedirs(run_dir, exist_ok=True)
+    os.makedirs(imgs_dir, exist_ok=True)
+    print('\nResults to be saved in directory %s\n'%(run_dir))
     
     n_epochs = 200
     batch_size = 64
@@ -76,11 +82,6 @@ def main():
     encoder = Encoder_CNN(latent_dim, n_c)
     discriminator = Discriminator_CNN(wass_metric=wass_metric)
     
-    print(generator)
-    print(encoder)
-    print(discriminator)
-    
-    
     if cuda:
         generator.cuda()
         encoder.cuda()
@@ -110,8 +111,6 @@ def main():
     # ----------
     #  Training
     # ----------
-    a_acc = []
-    n_acc = []
     g_l = []
     e_l = []
     ge_l = []
@@ -221,101 +220,77 @@ def main():
             d_loss.backward()
             optimizer_D.step()
     
-            #if (i % 5 == 0):
-            #    d_loss.backward()
-            #    optimizer_D.step()
-    
-            #print ("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [E loss: %f]" % (epoch, 
-            #                                                    n_epochs, i, len(dataloader),
-            #                                                    d_loss.item(), g_loss.item(), e_loss.item()))
-    
-            batches_done = epoch * len(dataloader) + i
-            if batches_done % sample_interval == 0:
-                # Cycle through real -> enc -> gen
-                r_imgs = real_imgs.data[:25]
-                e_zn, e_zc = encoder(r_imgs, seval=True)
-                reg_imgs = generator(e_zn, e_zc)
-                img_mse_loss = mse_loss(r_imgs, reg_imgs)
-                c_i.append(img_mse_loss.item())
-                
-                # Cycle through enc -> gen -> enc
-                zn_samp, zc_samp, zc_samp_idx = sample_z(shape=25, latent_dim=latent_dim, n_c=n_c, req_grad=False)
-                gen_imgs_samp = generator(zn_samp, zc_samp)
-                zn_e, zc_e = encoder(gen_imgs_samp, seval=True)
-                lat_mse_loss = mse_loss(zn_e, zn_samp)
-                lat_xe_loss = xe_loss(zc_e, zc_samp_idx)
-                c_zn.append(lat_mse_loss.item())
-                c_zc.append(lat_xe_loss.item())
-                
-                # Save some examples!
-                save_image(r_imgs.data[:25], '%s/real_%06i.png' %(run_dir, batches_done), 
-                           nrow=5, normalize=True)
-                save_image(reg_imgs.data[:25], '%s/reg_%06i.png' %(run_dir, batches_done), 
-                           nrow=5, normalize=True)
-                save_image(gen_imgs.data[:25], '%s/gen_%06i.png' %(run_dir, batches_done), 
-                           nrow=5, normalize=True)
-                
-                d_l.append(d_loss.item())
-                ge_l.append(ge_loss.item())
-                g_l.append(g_loss.item())
-                e_l.append(e_loss.item())
+            #batches_done = epoch * len(dataloader) + i
+            #if batches_done % sample_interval == 0:
+
+        # Cycle through real -> enc -> gen
+        r_imgs = real_imgs.data[:25]
+        e_zn, e_zc = encoder(r_imgs, seval=True)
+        reg_imgs = generator(e_zn, e_zc)
+        img_mse_loss = mse_loss(r_imgs, reg_imgs)
+        # Save img reco cycle loss
+        c_i.append(img_mse_loss.item())
+        
+        # Cycle through enc -> gen -> enc
+        zn_samp, zc_samp, zc_samp_idx = sample_z(shape=25, latent_dim=latent_dim, n_c=n_c, req_grad=False)
+        gen_imgs_samp = generator(zn_samp, zc_samp)
+        zn_e, zc_e = encoder(gen_imgs_samp, seval=True)
+        lat_mse_loss = mse_loss(zn_e, zn_samp)
+        lat_xe_loss = xe_loss(zc_e, zc_samp_idx)
+        # Save cycle losses
+        c_zn.append(lat_mse_loss.item())
+        c_zc.append(lat_xe_loss.item())
+        
+        # Save some examples!
+        save_image(r_imgs.data[:25], '%s/real_%06i.png' %(imgs_dir, epoch), 
+                   nrow=5, normalize=True)
+        save_image(reg_imgs.data[:25], '%s/reg_%06i.png' %(imgs_dir, epoch), 
+                   nrow=5, normalize=True)
+        save_image(gen_imgs.data[:25], '%s/gen_%06i.png' %(imgs_dir, epoch), 
+                   nrow=5, normalize=True)
+        
+        # Save training losses
+        d_l.append(d_loss.item())
+        ge_l.append(ge_loss.item())
+        g_l.append(g_loss.item())
+        e_l.append(e_loss.item())
     
     
-                print ("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] "\
-                       "[GE loss: %f] [G loss: %f] [E loss: %f]" % ( epoch, 
+        print ("[Epoch %d/%d] \n"\
+               "\tModel Losses: [D: %f] [GE: %f] [G: %f] [E: %f]" % (epoch, 
                                                                      n_epochs, 
-                                                                     i, 
-                                                                     len(dataloader),
                                                                      d_loss.item(),
                                                                      ge_loss.item(),
                                                                      g_loss.item(), 
                                                                      e_loss.item())
-                      )
-                
-                print("\t Cycle Losses: [img %f] [latn %f] [latc %f]"%(img_mse_loss.item(), 
-                                                                       lat_mse_loss.item(), 
-                                                                       lat_xe_loss.item()))
+              )
+        
+        print("\tCycle Losses: [x %f] [z_n %f] [z_c %f]"%(img_mse_loss.item(), 
+                                                          lat_mse_loss.item(), 
+                                                          lat_xe_loss.item())
+             )
+
+    train_df = pd.DataFrame({
+                             'gen_loss' : ['G', g_l],
+                             'enc_loss' : ['E', e_l],
+                             'gen_enc_loss' : ['G+E', ge_l],
+                             'disc_loss' : ['D', d_l],
+                             'zn_cycle_loss' : ['$||Z_n-E(G(x))_n||$', c_zn],
+                             'zc_cycle_loss' : ['$||Z_c-E(G(x))_c||$', c_zc],
+                             'img_cycle_loss' : ['$||X-G(E(x))||$', c_i]
+                            })
 
 
-    # Rudimentary plotting section
-    earr = range(0, len(d_l))
-    
-    fig, ax = plt.subplots(figsize=(16,10))
-    ax.plot(earr, d_l, label='Dis')
-    ax.plot(earr, ge_l, label='Gen+Enc')
-    ax.plot(earr, g_l, label='Gen')
-    ax.plot(earr, e_l, label='Enc')
-    
-    ax.set(xlabel='Epoch', ylabel='Loss',
-           title='Loss vs Training Epoch')
-    #ax.set_xlim(230, 260)
-    #ax.set_xlim(0, 10)
-    #ax.set_ylim(-0.01, 40.3)
-    ax.grid()
-    #plt.yscale('log')
-    plt.legend(loc='upper right', fontsize=16)
-    
-    fig.savefig("%s/gan_loss_training.png"%(run_dir))
-    
-    
-    # Data for plotting
-    earr = range(0, len(d_l))#n_epochs)
-    
-    fig, ax = plt.subplots(figsize=(16,10))
-    ax.plot(earr, c_i, label='R')
-    ax.plot(earr, c_zn, label=r'$Z_n$')
-    ax.plot(earr, c_zc, label=r'$Z_c$')
-    
-    ax.set(xlabel='Epoch', ylabel='MSE',
-           title='Reco MSE vs Training Epoch')
-    #ax.set_xlim(230, 260)
-    #ax.set_xlim(0, 10)
-    #ax.set_ylim(-0.01, 40.3)
-    ax.grid()
-    plt.yscale('log')
-    plt.legend(loc='upper right', fontsize=16)
-    
-    fig.savefig("%s/reco_mse_training.png"%(run_dir))
+    # Plot some training results
+    plot_train_loss(df=train_df,
+                    arr_list=['gen_loss', 'enc_loss', 'gen_enc_loss', 'disc_loss'],
+                    figname='%s/gan_training_loss.png'%(run_dir)
+                    )
+
+    plot_train_loss(df=train_df,
+                    arr_list=['zn_cycle_loss', 'zc_cycle_loss', 'img_cycle_loss'],
+                    figname='%s/cycle_training_loss.png'%(run_dir)
+                    )
 
     # Save current state of gen and disc models
     disc_fname = "%s/discriminator_MNIST.pth.tar"%run_dir

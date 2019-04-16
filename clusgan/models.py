@@ -44,14 +44,16 @@ class Generator_CNN(nn.Module):
     output is a vector from image space of dimension X_dim
     """
     # Architecture : FC1024_BR-FC7x7x128_BR-(64)4dc2s_BR-(1)4dc2s_S
-    def __init__(self, latent_dim, n_c, x_shape):
+    def __init__(self, latent_dim, n_c, x_shape, verbose=False):
         super(Generator_CNN, self).__init__()
 
+        print("Setting up Generator...\n")
         self.latent_dim = latent_dim
         self.n_c = n_c
         self.x_shape = x_shape
         self.ishape = (128, 7, 7)
         self.iels = int(np.prod(self.ishape))
+        self.verbose = verbose
         
         self.model = nn.Sequential(
             # Fully connected layers
@@ -75,6 +77,9 @@ class Generator_CNN(nn.Module):
         )
 
         initialize_weights(self)
+
+        if self.verbose:
+            print(self.model)
     
     def forward(self, zn, zc):
         z = torch.cat((zn, zc), 1)
@@ -84,14 +89,16 @@ class Generator_CNN(nn.Module):
         x_gen = x_gen.view(x_gen.size(0), *self.x_shape)
         return x_gen
 
+
 class Encoder_CNN(nn.Module):
     """
     CNN to model the encoder of a ClusterGAN
     Input is vector X from image space if dimension X_dim
     Output is vector z from representation space of dimension z_dim
     """
-    def __init__(self, latent_dim, n_c):
+    def __init__(self, latent_dim, n_c, verbose=False):
         super(Encoder_CNN, self).__init__()
+        print("Setting up Encoder...\n")
 
         self.channels = 1
         self.latent_dim = latent_dim
@@ -99,8 +106,9 @@ class Encoder_CNN(nn.Module):
         self.cshape = (128, 5, 5)
         self.iels = int(np.prod(self.cshape))
         self.lshape = (self.iels,)
+        self.verbose = verbose
         
-        self.inference = nn.Sequential(
+        self.model = nn.Sequential(
             # Convolutional layers
             nn.Conv2d(self.channels, 64, 4, stride=2, bias=True),
             nn.LeakyReLU(0.2, inplace=True),
@@ -117,10 +125,12 @@ class Encoder_CNN(nn.Module):
         )
 
         initialize_weights(self)
+        
+        if self.verbose:
+            print(self.model)
 
     def forward(self, in_feat, seval=False):
-        #print("Encoder")
-        z_img = self.inference(in_feat)
+        z_img = self.model(in_feat)
         # Reshape for output
         z = z_img.view(z_img.shape[0], -1)
         # Separate continuous and one-hot components
@@ -130,6 +140,7 @@ class Encoder_CNN(nn.Module):
         zc = softmax(zc)
         return zn, zc
 
+
 class Discriminator_CNN(nn.Module):
     """
     CNN to model the discriminator of a ClusterGAN
@@ -138,16 +149,17 @@ class Discriminator_CNN(nn.Module):
     z is Encoder(X), and if z is sampled from representation space, X is Generator(z)
     Output is a 1-dimensional value
     """            
-    # Network Architecture is exactly same as in infoGAN (https://arxiv.org/abs/1606.03657)
     # Architecture : (64)4c2s-(128)4c2s_BL-FC1024_BL-FC1_S
-    def __init__(self, wass_metric=False):
+    def __init__(self, wass_metric=False, verbose=False):
         super(Discriminator_CNN, self).__init__()
         
+        print("Setting up Discriminator...\n")
         self.channels = 1
         self.cshape = (128, 5, 5)
         self.iels = int(np.prod(self.cshape))
         self.lshape = (self.iels,)
         self.wass = wass_metric
+        self.verbose = verbose
         
         self.model = nn.Sequential(
             # Convolutional layers
@@ -170,6 +182,9 @@ class Discriminator_CNN(nn.Module):
             self.model = nn.Sequential(self.model, torch.nn.Sigmoid())
 
         initialize_weights(self)
+
+        if self.verbose:
+            print(self.model)
 
     def forward(self, img):
         # Get output
