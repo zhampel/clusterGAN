@@ -58,19 +58,19 @@ class Generator_CNN(nn.Module):
         self.model = nn.Sequential(
             # Fully connected layers
             torch.nn.Linear(self.latent_dim + self.n_c, 1024),
-            torch.nn.ReLU(True),
             nn.BatchNorm1d(1024),
+            torch.nn.ReLU(True),
             torch.nn.Linear(1024, self.iels),
-            torch.nn.ReLU(),
             nn.BatchNorm1d(self.iels),
+            torch.nn.ReLU(True),
         
             # Reshape to 128 x (7x7)
             Reshape(self.ishape),
 
             # Upconvolution layers
             nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=True),
-            torch.nn.ReLU(True),
             nn.BatchNorm2d(64),
+            torch.nn.ReLU(True),
             
             nn.ConvTranspose2d(64, 1, 4, stride=2, padding=1, bias=True),
             nn.Sigmoid()

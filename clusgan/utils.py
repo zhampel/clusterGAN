@@ -30,10 +30,13 @@ def softmax(x):
 
 # Cross Entropy loss with two vector inputs
 def cross_entropy(pred, soft_targets):
-    #logsoftmax = nn.LogSoftmax()
-    #return torch.mean(torch.sum(- soft_targets * logsoftmax(pred), 1))
-    #logsoftmax = torch.nn.functional.log_softmax()
-    return torch.mean(torch.sum(- soft_targets * torch.nn.functional.log_softmax(pred), 1))
+    log_softmax_pred = torch.nn.functional.log_softmax(pred, dim=1)
+    return torch.mean( torch.sum(- soft_targets * log_softmax_pred, 1) )
+
+
+# Save a provided model to file
+def save_model(model=None, name='model.pth.tar'):
+    torch.save(model.state_dict(), name)
 
 
 # Weight Initializer
@@ -58,7 +61,7 @@ def weights_init(m):
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
 
-
+# Sample a random latent space vector
 def sample_z(shape=64, latent_dim=10, n_c=10, req_grad=False):
 
     Tensor = torch.cuda.FloatTensor
@@ -68,14 +71,14 @@ def sample_z(shape=64, latent_dim=10, n_c=10, req_grad=False):
 
     ######### zc, zc_idx variables with grads, and zc to one-hot vector
     # Pure one-hot vector generation
-    #zc_idx = torch.empty(shape, dtype=torch.long).random_(n_c).cuda()
-    #zc_FT = Tensor(shape, n_c).fill_(0).scatter_(1, zc_idx.unsqueeze(1), 1.)
-    #zc = Variable(zc_FT, requires_grad=req_grad)
+    zc_idx = torch.empty(shape, dtype=torch.long).random_(n_c).cuda()
+    zc_FT = Tensor(shape, n_c).fill_(0).scatter_(1, zc_idx.unsqueeze(1), 1.)
+    zc = Variable(zc_FT, requires_grad=req_grad)
 
-    # Gaussian-noisey vector generation
-    zc = Variable(Tensor(np.random.normal(0, 1, (shape, n_c))), requires_grad=req_grad)
-    zc = softmax(zc)
-    zc_idx = torch.argmax(zc, dim=1)
+    ## Gaussian-noisey vector generation
+    #zc = Variable(Tensor(np.random.normal(0, 1, (shape, n_c))), requires_grad=req_grad)
+    #zc = softmax(zc)
+    #zc_idx = torch.argmax(zc, dim=1)
 
     # Return components of latent space variable
     return zn, zc, zc_idx
