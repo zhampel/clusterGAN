@@ -54,6 +54,7 @@ def main():
     decay = 2.5*1e-5
     img_size = 28
     channels = 1
+    n_skip_iter = 5
    
     # Latent space info
     latent_dim = 30
@@ -99,8 +100,8 @@ def main():
                        ])),
         batch_size=batch_size, shuffle=True)
    
-    ge_chain = ichain(generator.parameters(), encoder.parameters())
-    #optimizer_GE = torch.optim.Adam(ichain(generator.parameters(), encoder.parameters()), 
+    ge_chain = ichain(generator.parameters(),
+                      encoder.parameters())
     optimizer_GE = torch.optim.Adam(ge_chain, lr=lr, betas=(b1, b2), weight_decay=decay)
     optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr, betas=(b1, b2))
     #optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr, betas=(b1, b2), weight_decay=decay)
@@ -117,8 +118,8 @@ def main():
     c_zc = []
     c_i = []
     
-    print('\nBegin training session with %i epochs...\n'%(n_epochs))
     # Training loop 
+    print('\nBegin training session with %i epochs...\n'%(n_epochs))
     for epoch in range(n_epochs):
         for i, (imgs, itruth_label) in enumerate(dataloader):
            
@@ -126,6 +127,8 @@ def main():
             generator.zero_grad()
             encoder.zero_grad()
             discriminator.zero_grad()
+            # Ensure generator is trainable
+            generator.train()
             
             # Adversarial ground truths
             valid = Variable(Tensor(imgs.size(0), 1).fill_(1.0), requires_grad=False)
@@ -141,7 +144,7 @@ def main():
             optimizer_GE.zero_grad()
             
             # Sample random latent variables
-            zn, zc, zc_idx = sample_z(shape=imgs.shape[0], latent_dim=latent_dim, n_c=n_c, req_grad=True)
+            zn, zc, zc_idx = sample_z(shape=imgs.shape[0], latent_dim=latent_dim, n_c=n_c, req_grad=False)
     
             # Generate a batch of images
             gen_imgs = generator(zn, zc)
@@ -151,7 +154,6 @@ def main():
             D_real = discriminator(real_imgs)
             
             # Step for Generator & Encoder, n_skip_iter times less than for discriminator
-            n_skip_iter = 5
             if (i % n_skip_iter == 0):
                 # Encode the generated images
                 enc_gen_zn, enc_gen_zc, enc_gen_zc_logits = encoder(gen_imgs)
@@ -164,12 +166,13 @@ def main():
                 # Check requested metric
                 if wass_metric:
                     # Wasserstein GAN loss
-                    ge_loss = torch.mean(D_gen) + betan * torch.mean(zn_loss) + betac * torch.mean(zc_loss)
+                    ge_loss = torch.mean(D_gen) + betan * zn_loss + betac * zc_loss
                 else:
                     # Vanilla GAN loss
-                    ge_loss = -torch.mean(tlog(D_gen)) + betan * torch.mean(zn_loss) + betac * torch.mean(zc_loss)
+                    ge_loss = -torch.mean(tlog(D_gen)) + betan * zn_loss + betac * zc_loss
     
                 ge_loss.backward(retain_graph=True)
+                #ge_loss.backward()
                 optimizer_GE.step()
 
             # ---------------------
@@ -180,22 +183,23 @@ def main():
     
             # Measure discriminator's ability to classify real from generated samples
             if wass_metric:
-                # Wasserstein GAN loss
-                d_loss = torch.mean(D_real) - torch.mean(D_gen)
-                
-                # Additional gradient penalty term
-                gradient_penalty = calc_gradient_penalty(discriminator, real_imgs, gen_imgs)
-                gradient_penalty.backward(retain_graph=True)
-                
-                d_loss += gradient_penalty
+                # Gradient penalty term
+                grad_penalty = calc_gradient_penalty(discriminator, real_imgs, gen_imgs)
+                #grad_penalty.backward(retain_graph=True)
+
+                # Wasserstein GAN loss w/gradient penalty
+                d_loss = torch.mean(D_real) - torch.mean(D_gen) + grad_penalty
                 
             else:
                 # Vanilla GAN loss
-                d_loss = -torch.mean(tlog(D_real)) - torch.mean(tlog(1 - D_gen))
+                d_loss = -torch.mean(tlog(D_real) - tlog(1 - D_gen))
     
             d_loss.backward()
             optimizer_D.step()
-    
+
+
+        # Generator in eval mode
+        generator.eval()
 
         # Set number of examples for cycle calcs
         n_sqrt_samp = 5
@@ -210,9 +214,31 @@ def main():
         c_i.append(img_mse_loss.item())
         
         # Cycle through enc -> gen -> enc
+        gen_imgs_idx = []
+        stack_imgs = []
+        for idx in range(n_c):
+            zn_samp, zc_samp, zc_samp_idx = sample_z(shape=10, latent_dim=latent_dim, n_c=n_c, fix_class=idx, req_grad=False)
+            gen_imgs_samp = generator(zn_samp, zc_samp)
+            zn_e, zc_e, zc_e_logits = encoder(gen_imgs_samp, seval=True)
+            if (len(stack_imgs) == 0):
+                stack_imgs = gen_imgs_samp
+            else:
+                stack_imgs = torch.cat((stack_imgs, gen_imgs_samp), 0)
+            #print("Sampled: ", zc_samp_idx)
+            #print("Encoded: ", torch.argmax(zc_e, dim=1))
+            #print("Loss: ", xe_loss(zc_e_logits, zc_samp_idx))
+            gen_imgs_idx.append(gen_imgs_idx)
+
+        save_image(stack_imgs, '%s/gen_classes_%06i.png' %(imgs_dir, epoch), 
+                   nrow=10, normalize=True)
+      
+
         zn_samp, zc_samp, zc_samp_idx = sample_z(shape=n_samp, latent_dim=latent_dim, n_c=n_c, req_grad=False)
         gen_imgs_samp = generator(zn_samp, zc_samp)
         zn_e, zc_e, zc_e_logits = encoder(gen_imgs_samp, seval=True)
+        #print("Sampled: ", zc_samp_idx)
+        #print("Encoded: ", torch.argmax(zc_e, dim=1))
+        #print("Loss: ", xe_loss(zc_e_logits, zc_samp_idx))
         lat_mse_loss = mse_loss(zn_e, zn_samp)
         lat_xe_loss = xe_loss(zc_e_logits, zc_samp_idx)
         #lat_xe_loss = cross_entropy(zc_e_logits, zc_samp)

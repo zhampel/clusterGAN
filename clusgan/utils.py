@@ -62,7 +62,9 @@ def weights_init(m):
         m.bias.data.fill_(0)
 
 # Sample a random latent space vector
-def sample_z(shape=64, latent_dim=10, n_c=10, req_grad=False):
+def sample_z(shape=64, latent_dim=10, n_c=10, fix_class=-1, req_grad=False):
+
+    assert (fix_class == -1 or (fix_class >= 0 and fix_class < n_c) ), "Requested class %i outside bounds."%fix_class
 
     Tensor = torch.cuda.FloatTensor
     
@@ -71,8 +73,21 @@ def sample_z(shape=64, latent_dim=10, n_c=10, req_grad=False):
 
     ######### zc, zc_idx variables with grads, and zc to one-hot vector
     # Pure one-hot vector generation
-    zc_idx = torch.empty(shape, dtype=torch.long).random_(n_c).cuda()
-    zc_FT = Tensor(shape, n_c).fill_(0).scatter_(1, zc_idx.unsqueeze(1), 1.)
+    zc_FT = Tensor(shape, n_c).fill_(0)
+    zc_idx = torch.empty(shape, dtype=torch.long)
+
+    if (fix_class == -1):
+        zc_idx = zc_idx.random_(n_c).cuda()
+        zc_FT = zc_FT.scatter_(1, zc_idx.unsqueeze(1), 1.)
+        #zc_idx = torch.empty(shape, dtype=torch.long).random_(n_c).cuda()
+        #zc_FT = Tensor(shape, n_c).fill_(0).scatter_(1, zc_idx.unsqueeze(1), 1.)
+    else:
+        zc_idx[:] = fix_class
+        zc_FT[:, fix_class] = 1
+
+        zc_idx = zc_idx.cuda()
+        zc_FT = zc_FT.cuda()
+
     zc = Variable(zc_FT, requires_grad=req_grad)
 
     ## Gaussian-noisey vector generation
