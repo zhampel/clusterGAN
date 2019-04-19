@@ -235,6 +235,16 @@ def main():
         c_zn.append(lat_mse_loss.item())
         c_zc.append(lat_xe_loss.item())
       
+        # Save randomly generated examples!
+        save_image(r_imgs.data[:n_samp],
+                   '%s/real_%06i.png' %(imgs_dir, epoch), 
+                   nrow=n_sqrt_samp, normalize=True)
+        save_image(reg_imgs.data[:n_samp],
+                   '%s/reg_%06i.png' %(imgs_dir, epoch), 
+                   nrow=n_sqrt_samp, normalize=True)
+        save_image(gen_imgs_samp.data[:n_samp],
+                   '%s/gen_%06i.png' %(imgs_dir, epoch), 
+                   nrow=n_sqrt_samp, normalize=True)
         
         ## Generate samples for specified classes
         stack_imgs = []
@@ -258,17 +268,6 @@ def main():
                    '%s/gen_classes_%06i.png' %(imgs_dir, epoch), 
                    nrow=n_c, normalize=True)
       
-
-        # Save randomly generated examples!
-        save_image(r_imgs.data[:n_samp],
-                   '%s/real_%06i.png' %(imgs_dir, epoch), 
-                   nrow=n_sqrt_samp, normalize=True)
-        save_image(reg_imgs.data[:n_samp],
-                   '%s/reg_%06i.png' %(imgs_dir, epoch), 
-                   nrow=n_sqrt_samp, normalize=True)
-        save_image(gen_imgs_samp.data[:n_samp],
-                   '%s/gen_%06i.png' %(imgs_dir, epoch), 
-                   nrow=n_sqrt_samp, normalize=True)
         
         # Save training losses
         d_l.append(d_loss.item())
