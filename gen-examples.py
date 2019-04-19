@@ -29,6 +29,7 @@ try:
     from clusgan.definitions import DATASETS_DIR, RUNS_DIR
     from clusgan.models import Generator_CNN, Encoder_CNN, Discriminator_CNN
     from clusgan.utils import sample_z
+    from clusgan.datasets import get_dataloader, dataset_list
 
     from sklearn.manifold import TSNE
 except ImportError as e:
@@ -37,39 +38,46 @@ except ImportError as e:
 
 def main():
     global args
-    parser = argparse.ArgumentParser(description="Convolutional NN Training Script")
+    parser = argparse.ArgumentParser(description="Script to save generated examples from learned ClusterGAN generator")
     parser.add_argument("-r", "--run_name", dest="run_name", default='clusgan', help="Name of training run")
+    parser.add_argument("-b", "--batch_size", dest="batch_size", default=100, type=int, help="Batch size")
+    parser.add_argument("-s", "--dataset_name", dest="dataset_name", default='mnist', choices=dataset_list,  help="Dataset name")
     args = parser.parse_args()
 
-    n_sne = 100
-    batch_size = n_sne
+    batch_size = args.batch_size
     
-    # Make directory structure for this run
+    # Directory structure for this run
     run_name = args.run_name
-    run_dir = '%s/%s'%(RUNS_DIR, run_name)
-    imgs_dir = '%s/images'%(run_dir)
+    dataset_name = args.dataset_name
+    
+    run_dir = os.path.join(RUNS_DIR, dataset_name, run_name)
+    data_dir = os.path.join(DATASETS_DIR, dataset_name)
+    imgs_dir = os.path.join(run_dir, 'images')
+    models_dir = os.path.join(run_dir, 'models')
 
 
     # Latent space info
-    latent_dim = 30
-    n_c = 10
+    train_df = pd.read_csv('%s/training_details.csv'%(run_dir))
+    latent_dim = train_df['latent_dim'][0]
+    n_c = train_df['n_classes'][0]
 
     cuda = True if torch.cuda.is_available() else False
     
     # Load encoder model
     encoder = Encoder_CNN(latent_dim, n_c)
-    enc_fname = "%s/encoder_MNIST.pth.tar"%(run_dir)
+    enc_fname = os.path.join(models_dir, encoder.name + '.pth.tar')
     encoder.load_state_dict(torch.load(enc_fname))
     encoder.cuda()
 
-    # Load encoder model
+    # Load generator model
     x_shape = (1, 28, 28)
     generator = Generator_CNN(latent_dim, n_c, x_shape)
-    gen_fname = "%s/generator_MNIST.pth.tar"%(run_dir)
+    gen_fname = os.path.join(models_dir, generator.name + '.pth.tar')
     generator.load_state_dict(torch.load(gen_fname))
     generator.cuda()
     generator.eval()
-    
+   
+    # Loop through specific classes
     for idx in range(n_c):
         zn, zc, zc_idx = sample_z(shape=batch_size, latent_dim=latent_dim, n_c=n_c, fix_class=idx, req_grad=False)
     
@@ -81,9 +89,6 @@ def main():
                    nrow=int(np.sqrt(batch_size)), normalize=True)
 
         enc_zn, enc_zc, enc_zc_logits = encoder(gen_imgs)
-        print(idx)
-        print(zc_idx)
-        print(torch.argmax(enc_zc, dim=1))
         
         # Generate a batch of images
         gen_imgs = generator(enc_zn, enc_zc)
@@ -91,34 +96,8 @@ def main():
         # Save some examples!
         save_image(gen_imgs.data, '%s/class_enc_%i_gen.png' %(imgs_dir, idx), 
                    nrow=int(np.sqrt(batch_size)), normalize=True)
-        print(torch.argmax(enc_zc, dim=1))
         enc_zn, enc_zc, enc_zc_logits = encoder(gen_imgs)
-        print(torch.argmax(enc_zc, dim=1))
 
-            
-
-    #Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-
-    #perplexity = 40
-    #tsne = TSNE(n_components=2, verbose=1, perplexity=perplexity, n_iter=2000)
-
-    ## Get full batch for encoding
-    #imgs, labels = next(iter(dataloader))
-    #c_imgs = Variable(imgs.type(Tensor), requires_grad=False)
-    #enc_zn, enc_zc, enc_zc_logits = encoder(c_imgs)
-
-    ## Stack latent space encoding
-    #enc = np.hstack((enc_zn.cpu().detach().numpy(), enc_zc.cpu().detach().numpy()))
-
-    ## Cluster with TSNE
-    #tsne_enc = tsne.fit_transform(enc)
-
-    #fname = '%s/tsne.png'%(run_dir)
-    #fig, ax = plt.subplots(figsize=(16,10))
-    #ax.set_title("Perplexity=%d" % perplexity)
-    #ax.scatter(tsne_enc[:, 0], tsne_enc[:, 1], c=labels)
-    #ax.axis('tight')
-    #fig.savefig(fname)
 
 if __name__ == "__main__":
     main()

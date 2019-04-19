@@ -91,7 +91,9 @@ setup(
     install_requires=INSTALL_REQUIRES, #external packages as dependencies
     setup_requires=['setuptools>=38.6.0'],
     scripts=[
-             'train_mnist.py',
+             'train.py',
+             'gen-examples.py',
+             'tsne-cluster.py',
             ],
     # $ setup.py publish support.
     cmdclass={
