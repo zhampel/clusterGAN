@@ -27,7 +27,7 @@ try:
     from clusgan.definitions import DATASETS_DIR, RUNS_DIR
     from clusgan.models import Generator_CNN, Encoder_CNN, Discriminator_CNN
     from clusgan.utils import tlog, save_model, calc_gradient_penalty, sample_z, cross_entropy
-    from clusgan.datasets import get_dataloader
+    from clusgan.datasets import get_dataloader, dataset_list
     from clusgan.plots import plot_train_loss
 except ImportError as e:
     print(e)
@@ -39,7 +39,7 @@ def main():
     parser.add_argument("-r", "--run_name", dest="run_name", default='clusgan', help="Name of training run")
     parser.add_argument("-n", "--n_epochs", dest="n_epochs", default=200, type=int, help="Number of epochs")
     parser.add_argument("-b", "--batch_size", dest="batch_size", default=64, type=int, help="Batch size")
-    parser.add_argument("-s", "--dataset_name", dest="dataset_name", default='mnist', help="Dataset name")
+    parser.add_argument("-s", "--dataset_name", dest="dataset_name", default='mnist', choices=dataset_list,  help="Dataset name")
     args = parser.parse_args()
 
     run_name = args.run_name

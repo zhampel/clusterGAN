@@ -14,9 +14,13 @@ except ImportError as e:
     print(e)
     raise ImportError
 
+
 DATASET_FN_DICT = {'mnist' : datasets.MNIST,
                    'fashion-mnist' : datasets.FashionMNIST
                   }
+
+
+dataset_list = DATASET_FN_DICT.keys()
 
 
 def get_dataset(dataset_name='mnist'):
