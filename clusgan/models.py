@@ -48,6 +48,7 @@ class Generator_CNN(nn.Module):
         super(Generator_CNN, self).__init__()
 
         print("Setting up Generator...\n")
+        self.name = 'generator'
         self.latent_dim = latent_dim
         self.n_c = n_c
         self.x_shape = x_shape
@@ -79,6 +80,7 @@ class Generator_CNN(nn.Module):
         initialize_weights(self)
 
         if self.verbose:
+            print("Setting up {}...\n".format(self.name))
             print(self.model)
     
     def forward(self, zn, zc):
@@ -98,8 +100,9 @@ class Encoder_CNN(nn.Module):
     """
     def __init__(self, latent_dim, n_c, verbose=False):
         super(Encoder_CNN, self).__init__()
-        print("Setting up Encoder...\n")
 
+        print("Setting up Encoder...\n")
+        self.name = 'encoder'
         self.channels = 1
         self.latent_dim = latent_dim
         self.n_c = n_c
@@ -127,9 +130,10 @@ class Encoder_CNN(nn.Module):
         initialize_weights(self)
         
         if self.verbose:
+            print("Setting up {}...\n".format(self.name))
             print(self.model)
 
-    def forward(self, in_feat, seval=False):
+    def forward(self, in_feat):
         z_img = self.model(in_feat)
         # Reshape for output
         z = z_img.view(z_img.shape[0], -1)
@@ -153,7 +157,7 @@ class Discriminator_CNN(nn.Module):
     def __init__(self, wass_metric=False, verbose=False):
         super(Discriminator_CNN, self).__init__()
         
-        print("Setting up Discriminator...\n")
+        self.name = 'discriminator'
         self.channels = 1
         self.cshape = (128, 5, 5)
         self.iels = int(np.prod(self.cshape))
@@ -184,6 +188,7 @@ class Discriminator_CNN(nn.Module):
         initialize_weights(self)
 
         if self.verbose:
+            print("Setting up {}...\n".format(self.name))
             print(self.model)
 
     def forward(self, img):

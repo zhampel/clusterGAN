@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 try:
+    import os
     import numpy as np
     
     from torch.autograd import Variable
@@ -35,8 +36,16 @@ def cross_entropy(pred, soft_targets):
 
 
 # Save a provided model to file
-def save_model(model=None, name='model.pth.tar'):
-    torch.save(model.state_dict(), name)
+def save_model(models=[], out_dir=''):
+
+    # Ensure at least one model to save
+    assert len(models) > 0, "Must have at least one model to save."
+
+    # Save models to directory out_dir
+    for model in models:
+        filename = model.name + '.pth.tar'
+        outfile = os.path.join(out_dir, filename)
+        torch.save(model.state_dict(), outfile)
 
 
 # Weight Initializer

@@ -27,6 +27,7 @@ try:
     from clusgan.definitions import DATASETS_DIR, RUNS_DIR
     from clusgan.models import Generator_CNN, Encoder_CNN, Discriminator_CNN
     from clusgan.utils import tlog, save_model, calc_gradient_penalty, sample_z, cross_entropy
+    from clusgan.datasets import get_dataloader
     from clusgan.plots import plot_train_loss
 except ImportError as e:
     print(e)
@@ -36,25 +37,37 @@ def main():
     global args
     parser = argparse.ArgumentParser(description="Convolutional NN Training Script")
     parser.add_argument("-r", "--run_name", dest="run_name", default='clusgan', help="Name of training run")
+    parser.add_argument("-n", "--n_epochs", dest="n_epochs", default=200, type=int, help="Number of epochs")
+    parser.add_argument("-b", "--batch_size", dest="batch_size", default=64, type=int, help="Batch size")
+    parser.add_argument("-s", "--dataset_name", dest="dataset_name", default='mnist', help="Dataset name")
     args = parser.parse_args()
 
-    # Make directory structure for this run
     run_name = args.run_name
-    run_dir = '%s/%s'%(RUNS_DIR, run_name)
-    imgs_dir = '%s/images'%(run_dir)
+    dataset_name = args.dataset_name
+
+    # Make directory structure for this run
+    run_dir = os.path.join(RUNS_DIR, dataset_name, run_name)
+    data_dir = os.path.join(DATASETS_DIR, dataset_name)
+    imgs_dir = os.path.join(run_dir, 'images')
+    models_dir = os.path.join(run_dir, 'models')
+
+    os.makedirs(data_dir, exist_ok=True)
     os.makedirs(run_dir, exist_ok=True)
     os.makedirs(imgs_dir, exist_ok=True)
+    os.makedirs(models_dir, exist_ok=True)
     print('\nResults to be saved in directory %s\n'%(run_dir))
     
-    n_epochs = 200
-    batch_size = 64
+    # Training details
+    n_epochs = args.n_epochs
+    batch_size = args.batch_size
     lr = 1e-4
     b1 = 0.5
     b2 = 0.9 #99
     decay = 2.5*1e-5
+    n_skip_iter = 5
+
     img_size = 28
     channels = 1
-    n_skip_iter = 5
    
     # Latent space info
     latent_dim = 30
@@ -90,15 +103,7 @@ def main():
         
     
     # Configure data loader
-    data_dir = '%s/mnist'%DATASETS_DIR
-    os.makedirs(data_dir, exist_ok=True)
-    dataloader = torch.utils.data.DataLoader(
-        datasets.MNIST(data_dir, train=True, download=True,
-                       transform=transforms.Compose([
-                           transforms.ToTensor(),
-                           #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-                       ])),
-        batch_size=batch_size, shuffle=True)
+    dataloader = get_dataloader(dataset_name=dataset_name, data_dir=data_dir, batch_size=batch_size)
    
     ge_chain = ichain(generator.parameters(),
                       encoder.parameters())
@@ -123,17 +128,13 @@ def main():
     for epoch in range(n_epochs):
         for i, (imgs, itruth_label) in enumerate(dataloader):
            
+            # Ensure generator is trainable
+            generator.train()
             # Zero gradients for models
             generator.zero_grad()
             encoder.zero_grad()
             discriminator.zero_grad()
-            # Ensure generator is trainable
-            generator.train()
             
-            # Adversarial ground truths
-            valid = Variable(Tensor(imgs.size(0), 1).fill_(1.0), requires_grad=False)
-            fake = Variable(Tensor(imgs.size(0), 1).fill_(0.0), requires_grad=False)
-    
             # Configure input
             real_imgs = Variable(imgs.type(Tensor))
 
@@ -144,7 +145,9 @@ def main():
             optimizer_GE.zero_grad()
             
             # Sample random latent variables
-            zn, zc, zc_idx = sample_z(shape=imgs.shape[0], latent_dim=latent_dim, n_c=n_c, req_grad=False)
+            zn, zc, zc_idx = sample_z(shape=imgs.shape[0],
+                                      latent_dim=latent_dim,
+                                      n_c=n_c)
     
             # Generate a batch of images
             gen_imgs = generator(zn, zc)
@@ -172,7 +175,6 @@ def main():
                     ge_loss = -torch.mean(tlog(D_gen)) + betan * zn_loss + betac * zc_loss
     
                 ge_loss.backward(retain_graph=True)
-                #ge_loss.backward()
                 optimizer_GE.step()
 
             # ---------------------
@@ -185,7 +187,6 @@ def main():
             if wass_metric:
                 # Gradient penalty term
                 grad_penalty = calc_gradient_penalty(discriminator, real_imgs, gen_imgs)
-                #grad_penalty.backward(retain_graph=True)
 
                 # Wasserstein GAN loss w/gradient penalty
                 d_loss = torch.mean(D_real) - torch.mean(D_gen) + grad_penalty
@@ -205,40 +206,28 @@ def main():
         n_sqrt_samp = 5
         n_samp = n_sqrt_samp * n_sqrt_samp
 
-        # Cycle through real -> enc -> gen
+
+        ## Cycle through real -> enc -> gen
         r_imgs, i_label = real_imgs.data[:n_samp], itruth_label[:n_samp]
-        e_zn, e_zc, e_zc_logits = encoder(r_imgs, seval=True)
+        # Encode sample real instances
+        e_zn, e_zc, e_zc_logits = encoder(r_imgs)
+        # Generate sample instances from encoding
         reg_imgs = generator(e_zn, e_zc)
+        # Calculate cycle reconstruction loss
         img_mse_loss = mse_loss(r_imgs, reg_imgs)
         # Save img reco cycle loss
         c_i.append(img_mse_loss.item())
-        
-        # Cycle through enc -> gen -> enc
-        gen_imgs_idx = []
-        stack_imgs = []
-        for idx in range(n_c):
-            zn_samp, zc_samp, zc_samp_idx = sample_z(shape=10, latent_dim=latent_dim, n_c=n_c, fix_class=idx, req_grad=False)
-            gen_imgs_samp = generator(zn_samp, zc_samp)
-            zn_e, zc_e, zc_e_logits = encoder(gen_imgs_samp, seval=True)
-            if (len(stack_imgs) == 0):
-                stack_imgs = gen_imgs_samp
-            else:
-                stack_imgs = torch.cat((stack_imgs, gen_imgs_samp), 0)
-            #print("Sampled: ", zc_samp_idx)
-            #print("Encoded: ", torch.argmax(zc_e, dim=1))
-            #print("Loss: ", xe_loss(zc_e_logits, zc_samp_idx))
-            gen_imgs_idx.append(gen_imgs_idx)
+       
 
-        save_image(stack_imgs, '%s/gen_classes_%06i.png' %(imgs_dir, epoch), 
-                   nrow=10, normalize=True)
-      
-
-        zn_samp, zc_samp, zc_samp_idx = sample_z(shape=n_samp, latent_dim=latent_dim, n_c=n_c, req_grad=False)
+        ## Cycle through encoding -> generator -> encoder
+        zn_samp, zc_samp, zc_samp_idx = sample_z(shape=n_samp,
+                                                 latent_dim=latent_dim,
+                                                 n_c=n_c)
+        # Generate sample instances
         gen_imgs_samp = generator(zn_samp, zc_samp)
-        zn_e, zc_e, zc_e_logits = encoder(gen_imgs_samp, seval=True)
-        #print("Sampled: ", zc_samp_idx)
-        #print("Encoded: ", torch.argmax(zc_e, dim=1))
-        #print("Loss: ", xe_loss(zc_e_logits, zc_samp_idx))
+        # Encode sample instances
+        zn_e, zc_e, zc_e_logits = encoder(gen_imgs_samp)
+        # Calculate cycle latent losses
         lat_mse_loss = mse_loss(zn_e, zn_samp)
         lat_xe_loss = xe_loss(zc_e_logits, zc_samp_idx)
         #lat_xe_loss = cross_entropy(zc_e_logits, zc_samp)
@@ -246,13 +235,39 @@ def main():
         c_zn.append(lat_mse_loss.item())
         c_zc.append(lat_xe_loss.item())
       
+        
+        ## Generate samples for specified classes
+        stack_imgs = []
+        for idx in range(n_c):
+            # Sample specific class
+            zn_samp, zc_samp, zc_samp_idx = sample_z(shape=n_c,
+                                                     latent_dim=latent_dim,
+                                                     n_c=n_c,
+                                                     fix_class=idx)
 
-        # Save some examples!
-        save_image(r_imgs.data[:n_samp], '%s/real_%06i.png' %(imgs_dir, epoch), 
+            # Generate sample instances
+            gen_imgs_samp = generator(zn_samp, zc_samp)
+
+            if (len(stack_imgs) == 0):
+                stack_imgs = gen_imgs_samp
+            else:
+                stack_imgs = torch.cat((stack_imgs, gen_imgs_samp), 0)
+
+        # Save class-specified generated examples!
+        save_image(stack_imgs,
+                   '%s/gen_classes_%06i.png' %(imgs_dir, epoch), 
+                   nrow=n_c, normalize=True)
+      
+
+        # Save randomly generated examples!
+        save_image(r_imgs.data[:n_samp],
+                   '%s/real_%06i.png' %(imgs_dir, epoch), 
                    nrow=n_sqrt_samp, normalize=True)
-        save_image(reg_imgs.data[:n_samp], '%s/reg_%06i.png' %(imgs_dir, epoch), 
+        save_image(reg_imgs.data[:n_samp],
+                   '%s/reg_%06i.png' %(imgs_dir, epoch), 
                    nrow=n_sqrt_samp, normalize=True)
-        save_image(gen_imgs_samp.data[:n_samp], '%s/gen_%06i.png' %(imgs_dir, epoch), 
+        save_image(gen_imgs_samp.data[:n_samp],
+                   '%s/gen_%06i.png' %(imgs_dir, epoch), 
                    nrow=n_sqrt_samp, normalize=True)
         
         # Save training losses
@@ -272,9 +287,20 @@ def main():
                                                              lat_xe_loss.item())
              )
 
-
+    
     # Save training results
     train_df = pd.DataFrame({
+                             'n_epochs' : n_epochs,
+                             'learning_rate' : lr,
+                             'beta_1' : b1,
+                             'beta_2' : b2,
+                             'weight_decay' : decay,
+                             'n_skip_iter' : n_skip_iter,
+                             'latent_dim' : latent_dim,
+                             'n_classes' : n_c,
+                             'beta_n' : betan,
+                             'beta_c' : betac,
+                             'wass_metric' : wass_metric,
                              'gen_enc_loss' : ['G+E', ge_l],
                              'disc_loss' : ['D', d_l],
                              'zn_cycle_loss' : ['$||Z_n-E(G(x))_n||$', c_zn],
@@ -282,23 +308,24 @@ def main():
                              'img_cycle_loss' : ['$||X-G(E(x))||$', c_i]
                             })
 
+    train_df.to_csv('%s/training_details.csv'%(run_dir))
+
 
     # Plot some training results
     plot_train_loss(df=train_df,
                     arr_list=['gen_enc_loss', 'disc_loss'],
-                    figname='%s/gan_training_loss.png'%(run_dir)
+                    figname='%s/training_model_losses.png'%(run_dir)
                     )
 
     plot_train_loss(df=train_df,
                     arr_list=['zn_cycle_loss', 'zc_cycle_loss', 'img_cycle_loss'],
-                    figname='%s/cycle_training_loss.png'%(run_dir)
+                    figname='%s/training_cycle_loss.png'%(run_dir)
                     )
 
 
-    # Save current state of gen and disc models
-    save_model(model=discriminator, name="%s/discriminator_MNIST.pth.tar"%(run_dir))
-    save_model(model=encoder, name="%s/encoder_MNIST.pth.tar"%(run_dir))
-    save_model(model=generator, name="%s/generator_MNIST.pth.tar"%(run_dir))
+    # Save current state of trained models
+    model_list = [discriminator, encoder, generator]
+    save_model(models=model_list, out_dir=models_dir)
 
 
 if __name__ == "__main__":
