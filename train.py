@@ -60,6 +60,7 @@ def main():
     # Training details
     n_epochs = args.n_epochs
     batch_size = args.batch_size
+    test_batch_size = 5000
     lr = 1e-4
     b1 = 0.5
     b2 = 0.9 #99
@@ -101,17 +102,21 @@ def main():
         xe_loss.cuda()
         mse_loss.cuda()
         
+    Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
     
-    # Configure data loader
+    # Configure training data loader
     dataloader = get_dataloader(dataset_name=dataset_name, data_dir=data_dir, batch_size=batch_size)
+
+    # Test data loader
+    testdata = get_dataloader(dataset_name=dataset_name, data_dir=data_dir, batch_size=test_batch_size, train_set=False)
+    test_imgs, test_labels = next(iter(testdata))
+    test_imgs = Variable(test_imgs.type(Tensor))
    
     ge_chain = ichain(generator.parameters(),
                       encoder.parameters())
     optimizer_GE = torch.optim.Adam(ge_chain, lr=lr, betas=(b1, b2), weight_decay=decay)
     optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr, betas=(b1, b2))
     #optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=lr, betas=(b1, b2), weight_decay=decay)
-    
-    Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
     # ----------
     #  Training
@@ -128,8 +133,9 @@ def main():
     for epoch in range(n_epochs):
         for i, (imgs, itruth_label) in enumerate(dataloader):
            
-            # Ensure generator is trainable
+            # Ensure generator/encoder are trainable
             generator.train()
+            encoder.train()
             # Zero gradients for models
             generator.zero_grad()
             encoder.zero_grad()
@@ -199,27 +205,34 @@ def main():
             optimizer_D.step()
 
 
+        # Save training losses
+        d_l.append(d_loss.item())
+        ge_l.append(ge_loss.item())
+   
+
         # Generator in eval mode
         generator.eval()
+        encoder.eval()
 
         # Set number of examples for cycle calcs
         n_sqrt_samp = 5
         n_samp = n_sqrt_samp * n_sqrt_samp
 
 
-        ## Cycle through real -> enc -> gen
-        r_imgs, i_label = real_imgs.data[:n_samp], itruth_label[:n_samp]
+        ## Cycle through test real -> enc -> gen
+        t_imgs, t_label = test_imgs.data, test_labels
+        #r_imgs, i_label = real_imgs.data[:n_samp], itruth_label[:n_samp]
         # Encode sample real instances
-        e_zn, e_zc, e_zc_logits = encoder(r_imgs)
+        e_tzn, e_tzc, e_tzc_logits = encoder(t_imgs)
         # Generate sample instances from encoding
-        reg_imgs = generator(e_zn, e_zc)
+        teg_imgs = generator(e_tzn, e_tzc)
         # Calculate cycle reconstruction loss
-        img_mse_loss = mse_loss(r_imgs, reg_imgs)
+        img_mse_loss = mse_loss(t_imgs, teg_imgs)
         # Save img reco cycle loss
         c_i.append(img_mse_loss.item())
        
 
-        ## Cycle through encoding -> generator -> encoder
+        ## Cycle through randomly sampled encoding -> generator -> encoder
         zn_samp, zc_samp, zc_samp_idx = sample_z(shape=n_samp,
                                                  latent_dim=latent_dim,
                                                  n_c=n_c)
@@ -235,7 +248,10 @@ def main():
         c_zn.append(lat_mse_loss.item())
         c_zc.append(lat_xe_loss.item())
       
-        # Save randomly generated examples!
+        # Save cycled and generated examples!
+        r_imgs, i_label = real_imgs.data[:n_samp], itruth_label[:n_samp]
+        e_zn, e_zc, e_zc_logits = encoder(r_imgs)
+        reg_imgs = generator(e_zn, e_zc)
         save_image(r_imgs.data[:n_samp],
                    '%s/real_%06i.png' %(imgs_dir, epoch), 
                    nrow=n_sqrt_samp, normalize=True)
@@ -267,13 +283,8 @@ def main():
         save_image(stack_imgs,
                    '%s/gen_classes_%06i.png' %(imgs_dir, epoch), 
                    nrow=n_c, normalize=True)
-      
-        
-        # Save training losses
-        d_l.append(d_loss.item())
-        ge_l.append(ge_loss.item())
-    
-    
+     
+
         print ("[Epoch %d/%d] \n"\
                "\tModel Losses: [D: %f] [GE: %f]" % (epoch, 
                                                      n_epochs, 
@@ -287,6 +298,8 @@ def main():
              )
 
     
+
+
     # Save training results
     train_df = pd.DataFrame({
                              'n_epochs' : n_epochs,

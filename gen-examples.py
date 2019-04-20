@@ -68,6 +68,7 @@ def main():
     enc_fname = os.path.join(models_dir, encoder.name + '.pth.tar')
     encoder.load_state_dict(torch.load(enc_fname))
     encoder.cuda()
+    encoder.eval()
 
     # Load generator model
     x_shape = (1, 28, 28)

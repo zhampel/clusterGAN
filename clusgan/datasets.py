@@ -45,12 +45,12 @@ def get_dataset(dataset_name='mnist'):
 
 
 
-def get_dataloader(dataset_name='mnist', data_dir='', batch_size=64):
+def get_dataloader(dataset_name='mnist', data_dir='', batch_size=64, train_set=True):
 
     dset = get_dataset(dataset_name)
 
     dataloader = torch.utils.data.DataLoader(
-        dset(data_dir, train=True, download=True,
+        dset(data_dir, train=train_set, download=True,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
                            #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))

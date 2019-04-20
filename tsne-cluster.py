@@ -70,14 +70,16 @@ def main():
     enc_fname = os.path.join(models_dir, encoder.name + '.pth.tar')
     encoder.load_state_dict(torch.load(enc_fname))
     encoder.cuda()
+    encoder.eval()
 
     # Configure data loader
-    dataloader = get_dataloader(dataset_name=dataset_name, data_dir=data_dir, batch_size=batch_size)
+    dataloader = get_dataloader(dataset_name=dataset_name, data_dir=data_dir, batch_size=batch_size, train_set=False)
     
     Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
     # Load TSNE
-    tsne = TSNE(n_components=2, verbose=1, perplexity=perplexity, n_iter=300)
+    tsne = TSNE(n_components=2, verbose=1, init='pca', random_state=0)
+    #tsne = TSNE(n_components=2, verbose=1, perplexity=perplexity, n_iter=300)
 
     # Get full batch for encoding
     imgs, labels = next(iter(dataloader))
