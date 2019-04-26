@@ -82,7 +82,7 @@ def main():
     x_shape = (channels, img_size, img_size)
     
     cuda = True if torch.cuda.is_available() else False
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     # Loss function
     bce_loss = torch.nn.BCELoss()
