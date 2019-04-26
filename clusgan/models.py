@@ -47,7 +47,6 @@ class Generator_CNN(nn.Module):
     def __init__(self, latent_dim, n_c, x_shape, verbose=False):
         super(Generator_CNN, self).__init__()
 
-        print("Setting up Generator...\n")
         self.name = 'generator'
         self.latent_dim = latent_dim
         self.n_c = n_c
@@ -60,10 +59,12 @@ class Generator_CNN(nn.Module):
             # Fully connected layers
             torch.nn.Linear(self.latent_dim + self.n_c, 1024),
             nn.BatchNorm1d(1024),
-            torch.nn.ReLU(True),
+            #torch.nn.ReLU(True),
+            nn.LeakyReLU(0.2, inplace=True),
             torch.nn.Linear(1024, self.iels),
             nn.BatchNorm1d(self.iels),
-            torch.nn.ReLU(True),
+            #torch.nn.ReLU(True),
+            nn.LeakyReLU(0.2, inplace=True),
         
             # Reshape to 128 x (7x7)
             Reshape(self.ishape),
@@ -71,7 +72,8 @@ class Generator_CNN(nn.Module):
             # Upconvolution layers
             nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=True),
             nn.BatchNorm2d(64),
-            torch.nn.ReLU(True),
+            #torch.nn.ReLU(True),
+            nn.LeakyReLU(0.2, inplace=True),
             
             nn.ConvTranspose2d(64, 1, 4, stride=2, padding=1, bias=True),
             nn.Sigmoid()
@@ -101,7 +103,6 @@ class Encoder_CNN(nn.Module):
     def __init__(self, latent_dim, n_c, verbose=False):
         super(Encoder_CNN, self).__init__()
 
-        print("Setting up Encoder...\n")
         self.name = 'encoder'
         self.channels = 1
         self.latent_dim = latent_dim

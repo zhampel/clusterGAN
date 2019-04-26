@@ -77,7 +77,7 @@ def main():
     betac = 10
    
     # Wasserstein metric flag
-    wass_metric=True
+    wass_metric = True
     
     x_shape = (channels, img_size, img_size)
     

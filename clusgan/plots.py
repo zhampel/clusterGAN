@@ -21,11 +21,12 @@ def plot_train_loss(df=[], arr_list=[''], figname='training_loss.png'):
         epochs = range(0, len(vals))
         ax.plot(epochs, vals, label=r'%s'%(label))
     
-    ax.set(xlabel='Epoch', ylabel='Loss',
-           title='Loss vs Training Epoch')
+    ax.set_xlabel('Epoch', fonstize=18)
+    ax.set_ylabel('Loss', fonstize=18)
+    ax.set_title('Training Loss', fontsize=24)
     ax.grid()
     #plt.yscale('log')
-    plt.legend(loc='upper right', fontsize=16)
+    plt.legend(loc='upper right', numpoints=1, fontsize=16)
     print(figname)
     plt.tight_layout()
     fig.savefig(figname)

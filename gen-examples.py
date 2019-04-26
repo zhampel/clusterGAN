@@ -39,16 +39,17 @@ except ImportError as e:
 def main():
     global args
     parser = argparse.ArgumentParser(description="Script to save generated examples from learned ClusterGAN generator")
-    parser.add_argument("-r", "--run_name", dest="run_name", default='clusgan', help="Name of training run")
+    parser.add_argument("-r", "--run_dir", dest="run_dir", help="Training run directory")
     parser.add_argument("-b", "--batch_size", dest="batch_size", default=100, type=int, help="Batch size")
-    parser.add_argument("-s", "--dataset_name", dest="dataset_name", default='mnist', choices=dataset_list,  help="Dataset name")
     args = parser.parse_args()
 
     batch_size = args.batch_size
     
     # Directory structure for this run
-    run_name = args.run_name
-    dataset_name = args.dataset_name
+    run_dir = args.run_dir.rstrip("/")
+    run_name = run_dir.split(os.sep)[-1]
+    dataset_name = run_dir.split(os.sep)[-2]
+    print(run_dir)
     
     run_dir = os.path.join(RUNS_DIR, dataset_name, run_name)
     data_dir = os.path.join(DATASETS_DIR, dataset_name)
