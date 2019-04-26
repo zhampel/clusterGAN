@@ -29,7 +29,7 @@ Below is an example set of training curves for 200 epochs, batch size of 64 on t
 
 <p float="left">
   <img src="docs/imgs/training_model_losses-mnist.png" width="200" />
-  <img src="docs/imgs/training_cycles_loss-mnist.png" width="200" />
+  <img src="docs/imgs/training_cycle_loss-mnist.png" width="200" />
 </p>
 
 
@@ -41,7 +41,7 @@ python gen-examples -r test_run -s mnist -b 100
 
 Here are some example generated images by specified class (each row) of the learned labels in latent space.
 <p float="left">
-  <img src="docs/images/gen_classes_000199-mnist" width="200" />
+  <img src="docs/images/gen_classes_000199-mnist.png" width="200" />
 </p>
 
 ## TSNE Figure
@@ -53,7 +53,7 @@ python tsne-cluster.py -r test_run -s mnist
 Below is the tSNE clustering figure of the latent space vectors of true MNIST images fed into the encoder.
 
 <p float="left">
-  <img src="docs/images/gen_classes_000199-mnist.png" width="200" />
+  <img src="docs/images/tsne-mnist-pca.png" width="200" />
 </p>
 
 
