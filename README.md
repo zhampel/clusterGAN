@@ -25,18 +25,36 @@ The `-r` option denotes the run name, `-s` the dataset (currently MNIST and Fash
 `-b` the batch size, and `-n` the number of training epochs.
 
 
+Below is an example set of training curves for 200 epochs, batch size of 64 on the MNIST dataset.
+
+<p float="left">
+  <img src="docs/imgs/training_model_losses-mnist.png" width="200" />
+  <img src="docs/imgs/training_cycles_loss-mnist.png" width="200" />
+</p>
+
+
 ## Generated Examples
 To generate examples from randomly sampled latent space variables, 
 ```
 python gen-examples -r test_run -s mnist -b 100
 ```
 
+Here are some example generated images by specified class (each row) of the learned labels in latent space.
+<p float="left">
+  <img src="docs/images/gen_classes_000199-mnist" width="200" />
+</p>
 
 ## TSNE Figure
 To produce a TSNE figure depicting the clustering of the latent space encoding of real images,
 ```
 python tsne-cluster.py -r test_run -s mnist
 ```
+
+Below is the tSNE clustering figure of the latent space vectors of true MNIST images fed into the encoder.
+
+<p float="left">
+  <img src="docs/images/gen_classes_000199-mnist.png" width="200" />
+</p>
 
 
 ## License
