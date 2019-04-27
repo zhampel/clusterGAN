@@ -21,8 +21,8 @@ def plot_train_loss(df=[], arr_list=[''], figname='training_loss.png'):
         epochs = range(0, len(vals))
         ax.plot(epochs, vals, label=r'%s'%(label))
     
-    ax.set_xlabel('Epoch', fonstize=18)
-    ax.set_ylabel('Loss', fonstize=18)
+    ax.set_xlabel('Epoch', fontsize=18)
+    ax.set_ylabel('Loss', fontsize=18)
     ax.set_title('Training Loss', fontsize=24)
     ax.grid()
     #plt.yscale('log')
