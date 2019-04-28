@@ -49,7 +49,6 @@ def main():
     run_dir = args.run_dir.rstrip("/")
     run_name = run_dir.split(os.sep)[-1]
     dataset_name = run_dir.split(os.sep)[-2]
-    print(run_dir)
     
     run_dir = os.path.join(RUNS_DIR, dataset_name, run_name)
     data_dir = os.path.join(DATASETS_DIR, dataset_name)
