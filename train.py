@@ -26,7 +26,7 @@ try:
 
     from clusgan.definitions import DATASETS_DIR, RUNS_DIR
     from clusgan.models import Generator_CNN, Encoder_CNN, Discriminator_CNN
-    from clusgan.utils import tlog, save_model, calc_gradient_penalty, sample_z, cross_entropy
+    from clusgan.utils import save_model, calc_gradient_penalty, sample_z, cross_entropy
     from clusgan.datasets import get_dataloader, dataset_list
     from clusgan.plots import plot_train_loss
 except ImportError as e:
@@ -78,6 +78,7 @@ def main():
    
     # Wasserstein metric flag
     wass_metric = True
+    #wass_metric = False
     
     x_shape = (channels, img_size, img_size)
     
@@ -178,7 +179,9 @@ def main():
                     ge_loss = torch.mean(D_gen) + betan * zn_loss + betac * zc_loss
                 else:
                     # Vanilla GAN loss
-                    ge_loss = -torch.mean(tlog(D_gen)) + betan * zn_loss + betac * zc_loss
+                    valid = Variable(Tensor(gen_imgs.size(0), 1).fill_(1.0), requires_grad=False)
+                    v_loss = bce_loss(D_gen, valid)
+                    ge_loss = v_loss + betan * zn_loss + betac * zc_loss
     
                 ge_loss.backward(retain_graph=True)
                 optimizer_GE.step()
@@ -199,7 +202,10 @@ def main():
                 
             else:
                 # Vanilla GAN loss
-                d_loss = -torch.mean(tlog(D_real) - tlog(1 - D_gen))
+                fake = Variable(Tensor(gen_imgs.size(0), 1).fill_(0.0), requires_grad=False)
+                real_loss = bce_loss(D_real, valid)
+                fake_loss = bce_loss(D_gen, fake)
+                d_loss = (real_loss + fake_loss) / 2
     
             d_loss.backward()
             optimizer_D.step()
