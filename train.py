@@ -40,23 +40,16 @@ def main():
     parser.add_argument("-n", "--n_epochs", dest="n_epochs", default=200, type=int, help="Number of epochs")
     parser.add_argument("-b", "--batch_size", dest="batch_size", default=64, type=int, help="Batch size")
     parser.add_argument("-s", "--dataset_name", dest="dataset_name", default='mnist', choices=dataset_list,  help="Dataset name")
+    parser.add_argument("-w", "--wass_metric", dest="wass_metric", action='store_true', help="Flag for Wasserstein metric")
+    parser.add_argument("-g", "-–gpu", dest="gpu", default=0, type=int, help="GPU id to use")
+    parser.add_argument("-k", "-–num_workers", dest="num_workers", default=1, type=int, help="Number of dataset workers")
     args = parser.parse_args()
 
     run_name = args.run_name
     dataset_name = args.dataset_name
+    device_id = args.gpu
+    num_workers = args.num_workers
 
-    # Make directory structure for this run
-    run_dir = os.path.join(RUNS_DIR, dataset_name, run_name)
-    data_dir = os.path.join(DATASETS_DIR, dataset_name)
-    imgs_dir = os.path.join(run_dir, 'images')
-    models_dir = os.path.join(run_dir, 'models')
-
-    os.makedirs(data_dir, exist_ok=True)
-    os.makedirs(run_dir, exist_ok=True)
-    os.makedirs(imgs_dir, exist_ok=True)
-    os.makedirs(models_dir, exist_ok=True)
-    print('\nResults to be saved in directory %s\n'%(run_dir))
-    
     # Training details
     n_epochs = args.n_epochs
     batch_size = args.batch_size
@@ -77,13 +70,33 @@ def main():
     betac = 10
    
     # Wasserstein metric flag
-    wass_metric = True
-    #wass_metric = False
+    # Wasserstein metric flag
+    wass_metric = args.wass_metric
+    mtype = 'van'
+    if (wass_metric):
+        mtype = 'wass'
+    
+    # Make directory structure for this run
+    sep_und = '_'
+    run_name_comps = ['%iepoch'%n_epochs, 'z%s'%str(latent_dim), mtype, 'bs%i'%batch_size, run_name]
+    run_name = sep_und.join(run_name_comps)
+
+    run_dir = os.path.join(RUNS_DIR, dataset_name, run_name)
+    data_dir = os.path.join(DATASETS_DIR, dataset_name)
+    imgs_dir = os.path.join(run_dir, 'images')
+    models_dir = os.path.join(run_dir, 'models')
+
+    os.makedirs(data_dir, exist_ok=True)
+    os.makedirs(run_dir, exist_ok=True)
+    os.makedirs(imgs_dir, exist_ok=True)
+    os.makedirs(models_dir, exist_ok=True)
+    print('\nResults to be saved in directory %s\n'%(run_dir))
     
     x_shape = (channels, img_size, img_size)
     
     cuda = True if torch.cuda.is_available() else False
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    torch.cuda.set_device(device_id)
 
     # Loss function
     bce_loss = torch.nn.BCELoss()
@@ -106,7 +119,10 @@ def main():
     Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
     
     # Configure training data loader
-    dataloader = get_dataloader(dataset_name=dataset_name, data_dir=data_dir, batch_size=batch_size)
+    dataloader = get_dataloader(dataset_name=dataset_name,
+                                data_dir=data_dir,
+                                batch_size=batch_size,
+                                num_workers=num_workers)
 
     # Test data loader
     testdata = get_dataloader(dataset_name=dataset_name, data_dir=data_dir, batch_size=test_batch_size, train_set=False)
